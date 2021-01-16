@@ -133,13 +133,14 @@ process denoise {
     params.mode == "all"
 
     """
-    qiime dada2 denoise-paired --p-n-threads $task.cpus \
+    qiime dada2 denoise-paired \
+        --p-n-threads $task.cpus \
         --i-demultiplexed-seqs $clean_reads \
         --p-trunc-len-f $params.trunc_len_forward \
         --p-trunc-len-r $params.trunc_len_reverse \
         --p-max-ee-f 3 \
         --p-max-ee-r 3 \
-        --p-min-fold-parent-over-abundance 3 \
+        --p-min-fold-parent-over-abundance $params.mfpoa \
         --o-table table.qza \
         --o-representative-sequences representative_sequences.qza \
         --o-denoising-stats denoising_stats.qza \
