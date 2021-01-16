@@ -1,6 +1,9 @@
 #!/usr/bin/env Rscript
 
 library(optparse)
+library(qiime2R)
+library(phyloseq)
+library(tidyverse)
 
 option_list = list(
     make_option(c("-f", "--features"), type="character", default="table.qza", 
@@ -20,7 +23,7 @@ option_list = list(
 opt_parser = OptionParser(option_list=option_list)
 opt = parse_args(opt_parser)
 
-physeq1 <- qiime2R::qza_to_phyloseq(
+physeq1 <- qza_to_phyloseq(
     features=opt$features,
     tree=opt$tree,
     taxonomy=opt$taxa,
@@ -28,6 +31,6 @@ physeq1 <- qiime2R::qza_to_phyloseq(
 )
 
 rep_seqs <- Biostrings::readDNAStringSet(opt$repseq, format = "fasta")
-physeq2 <- phyloseq::phyloseq(rep_seqs)
-physeq <- phyloseq::merge_phyloseq(physeq1, physeq2)
+physeq2 <- phyloseq(rep_seqs)
+physeq <- merge_phyloseq(physeq1, physeq2)
 save(physeq, file = opt$out)
