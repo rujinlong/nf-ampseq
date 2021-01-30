@@ -2,62 +2,56 @@
 // Usage: nextflow run ampliseq.nf -profile hpc_slurm --mode "remove_adapters"
 //        nextflow run ampliseq.nf -profile hpc_slurm --mode "all" -resume
 
-if (params.classifier == false) {
-    process train_classifier {
-        publishDir "$baseDir", mode: 'copy', overwrite: false
+nextflow.enable.dsl=2
 
-        output:
-        file("classifier.qza") into classifier_ch
+process train_classifier {
+    publishDir "$baseDir", mode: 'copy', overwrite: false
 
-        when:
-        params.mode == "all"
+    output:
+    path("classifier.qza"), emit: classifier_ch
 
-        """
-        qiime tools import \
-            --type 'FeatureData[Taxonomy]' \
-            --input-format HeaderlessTSVTaxonomyFormat \
-            --input-path $params.SILVA_taxonomy \
-            --output-path ref_taxonomy.qza
+    when:
+    params.mode == "all"
 
-        qiime tools import \
-            --type 'FeatureData[Sequence]' \
-            --input-path $params.SILVA_sequence \
-            --output-path ref_seqs.qza
+    """
+    qiime tools import \
+        --type 'FeatureData[Taxonomy]' \
+        --input-format HeaderlessTSVTaxonomyFormat \
+        --input-path $params.SILVA_taxonomy \
+        --output-path ref_taxonomy.qza
 
-        qiime feature-classifier extract-reads \
-            --i-sequences ref_seqs.qza \
-            --p-f-primer $params.primer_forward \
-            --p-r-primer $params.primer_reverse \
-            --p-min-length $params.min_reference_length \
-            --p-max-length $params.max_reference_length \
-            --o-reads ref_amplicon_seqs.qza \
-            --p-n-jobs $task.cpus \
-            --verbose \
-            &> z01_SILVA_99_otus_16S_V4_seqs.log
+    qiime tools import \
+        --type 'FeatureData[Sequence]' \
+        --input-path $params.SILVA_sequence \
+        --output-path ref_seqs.qza
 
-        qiime feature-classifier fit-classifier-naive-bayes \
-            --i-reference-taxonomy ref_taxonomy.qza \
-            --i-reference-reads ref_amplicon_seqs.qza \
-            --o-classifier classifier.qza \
-            --verbose \
-            &> classifier.log
-        """
-    }
-} else {
-    Channel
-        .fromPath(params.classifier)
-        .set { classifier_ch }
+    qiime feature-classifier extract-reads \
+        --i-sequences ref_seqs.qza \
+        --p-f-primer $params.primer_forward \
+        --p-r-primer $params.primer_reverse \
+        --p-min-length $params.min_reference_length \
+        --p-max-length $params.max_reference_length \
+        --o-reads ref_amplicon_seqs.qza \
+        --p-n-jobs $task.cpus \
+        --verbose \
+        &> z01_SILVA_99_otus_16S_V4_seqs.log
+
+    qiime feature-classifier fit-classifier-naive-bayes \
+        --i-reference-taxonomy ref_taxonomy.qza \
+        --i-reference-reads ref_amplicon_seqs.qza \
+        --o-classifier classifier.qza \
+        --verbose \
+        &> classifier.log
+    """
 }
-
 
 process prepare_input {
     publishDir "$baseDir", mode: 'copy', overwrite: true
     publishDir "$params.report", pattern: "metadata.tsv"
 
     output:
-    file("manifest.tsv") into manifest_ch
-    file("metadata.tsv") into metadata2taxonomy_ch
-    file("metadata.tsv") into metadata2phyloseq_ch
+    path("manifest.tsv"), emit: manifest_ch
+    path("metadata.tsv"), emit: metadata_ch
 
     """
     echo "sampleid,forward,reverse" > manifest.csv
@@ -71,17 +65,16 @@ process prepare_input {
     """
 }
 
-
 process remove_adapters {
     label "small"
     publishDir "$params.outdir/p01_clean_reads"
 
     input:
-    file(manifest) from manifest_ch
+    path(manifest)
 
     output:
-    file("reads_clean.qza") into clean_reads_ch
-    file("reads_clean.qzv")
+    path("reads_clean.qza"), emit: clean_reads_ch
+    path("reads_clean.qzv")
 
     when:
     params.mode == "all" || params.mode == "remove_adapters"
@@ -105,7 +98,6 @@ process remove_adapters {
     """
 }
 
-
 process denoise {
     label "big"
     publishDir "$params.outdir/p02_denoise"
@@ -115,18 +107,16 @@ process denoise {
     publishDir "$params.report", pattern: "feature_table.tsv"
 
     input:
-    file(clean_reads) from clean_reads_ch
+    path(clean_reads)
 
     output:
-    file("denoising_stats")
-    file("table")
-    file("representative_sequences")
-    file("repseqs.fasta") into repseq2phyloseq_ch
-    file("representative_sequences.qza") into repseq_ch1
-    file("representative_sequences.qza") into repseq_ch2
-    file("table.qza") into table_ch
-    file("table.qza") into table2phyloseq_ch
-    file("feature_table.tsv") into table2taxa_abundance
+    path("denoising_stats")
+    path("table")
+    path("representative_sequences")
+    path("repseqs.fasta"), emit: repseq
+    path("representative_sequences.qza"), emit: repseq_ch
+    path("table.qza"), emit: table_ch
+    path("feature_table.tsv"), emit: table2taxa_abundance
     
 
     when:
@@ -170,7 +160,6 @@ process denoise {
     """
 }
 
-
 process taxonomy {
     publishDir "$params.outdir/p03_taxonomy"
     publishDir "$params.report", pattern: "taxonomy_barplots"
@@ -178,17 +167,17 @@ process taxonomy {
     publishDir "$params.report", pattern: "taxa_abundance.tsv"
 
     input:
-    file(classifier) from classifier_ch
-    file(repseq) from repseq_ch1
-    file(table) from table_ch
-    file(metadata) from metadata2taxonomy_ch
-    file(feature_table) from table2taxa_abundance
+    path(classifier)
+    path(repseq)
+    path(table)
+    path(metadata)
+    path(feature_table)
 
     output:
-    file("taxa_abundance.tsv")
-    file("taxonomy_rep_seqs")
-    file("taxonomy_barplots")
-    file("taxonomy_rep_seqs.qza") into taxseq2phyloseq_ch
+    path("taxa_abundance.tsv")
+    path("taxonomy_rep_seqs")
+    path("taxonomy_barplots")
+    path("taxonomy_rep_seqs.qza"), emit: taxa_repseq
 
     when:
     params.mode == "all"
@@ -216,17 +205,17 @@ process taxonomy {
     """
 }
 
-
 process tree {
+    label "big"
     publishDir "$params.outdir/p03_tree"
     publishDir "$params.report", pattern: "rooted_tree.qza"
 
     input:
-    file(repseq) from repseq_ch2
+    path(repseq)
 
     output:
-    file("tree/*")
-    file("rooted_tree.qza") into tree2phyloseq_ch
+    path("tree/*")
+    path("rooted_tree.qza"), emit: tree_ch
 
     when:
     params.mode == "all"
@@ -247,21 +236,31 @@ process phyloseq {
     publishDir "$params.report"
 
     input:
-    file(table) from table2phyloseq_ch
-    file(tree) from tree2phyloseq_ch
-    file(taxseq) from taxseq2phyloseq_ch
-    file(metadata) from metadata2phyloseq_ch
-    file(repseq) from repseq2phyloseq_ch
+    path(table)
+    path(tree)
+    path(taxseq)
+    path(metadata)
+    path(repseq)
 
     output:
-    file("physeq.Rdata")
+    path("physeq.Rdata")
 
     """
     qiime2phyloseq.R -f $table -t $tree -a $taxseq -m $metadata -s $repseq -o physeq.Rdata
     """
 }
 
+workflow {
+    prepare_input()
+    remove_adapters(prepare_input.out.manifest_ch)
+    denoise(remove_adapters.out.clean_reads_ch)
 
-workflow.onComplete { 
-    println ( workflow.success ? "Done!" : "Oops .. something went wrong" )
+    if( params.classifier == "false" )
+        classifier_ch = train_classifier().out.classifier_ch
+    else
+        classifier_ch = channel.fromPath(params.classifier)
+
+    taxonomy(classifier_ch, denoise.out.repseq_ch, denoise.out.table_ch, prepare_input.out.metadata_ch, denoise.out.table2taxa_abundance)
+    tree(denoise.out.repseq_ch)
+    phyloseq(denoise.out.table_ch, tree.out.tree_ch, taxonomy.out.taxa_repseq, prepare_input.out.metadata_ch, denoise.out.repseq)
 }
