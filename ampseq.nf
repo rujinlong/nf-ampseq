@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
-// Usage: nextflow run ampliseq.nf -profile hpc_slurm --mode "remove_adapters"
-//        nextflow run ampliseq.nf -profile hpc_slurm --mode "all" -resume
+// Usage: nextflow run ampseq.nf -profile hpc_slurm -resume --mode "remove_adapters"
+//        nextflow run ampseq.nf -profile hpc_slurm --mode "all" -resume
 
 nextflow.enable.dsl=2
 
@@ -255,10 +255,13 @@ workflow {
     remove_adapters(prepare_input.out.manifest_ch)
     denoise(remove_adapters.out.clean_reads_ch)
 
-    if( params.classifier == "false" )
-        classifier_ch = train_classifier().out.classifier_ch
-    else
-        classifier_ch = channel.fromPath(params.classifier)
+    if( !file(params.classifier).exists() ) {
+        train_classifier()
+        classifier_ch = train_classifier.out.classifier_ch
+    }
+    else {
+        classifier_ch = params.classifier
+    }
 
     taxonomy(classifier_ch, denoise.out.repseq_ch, denoise.out.table_ch, prepare_input.out.metadata_ch, denoise.out.table2taxa_abundance)
     tree(denoise.out.repseq_ch)
