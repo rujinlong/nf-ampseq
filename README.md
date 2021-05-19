@@ -18,8 +18,8 @@ conda install -c rujinlong r-qiime2r
 ```sh
 nextflow run ampseq.nf -profile hpc_slurm -resume --mode "remove_adapters"
 
-# Check p02_primer_trimmed.qzv and modify nextflow.config
-qiime tools view p02_primer_trimmed.qzv
+# Check output/p01_clean_reads/reads_clean.qzv and modify nextflow.config
+qiime tools view reads_clean.qzv
 
-nextflow run ampseq.nf -profile hpc_slurm -resume --mode "all" --classifier false
+nextflow run ampseq.nf -profile hpc_slurm -resume --mode "all" [--classifier false]
 ```
