@@ -1,0 +1,1 @@
+/home/viro/jinlong.ru/github/VIRO_pipelines/slurm_script/qiime2.slurm
