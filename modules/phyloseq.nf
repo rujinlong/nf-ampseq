@@ -13,6 +13,6 @@ process PHYLOSEQ {
     path("physeq.Rdata")
 
     """
-    qiime2phyloseq.R -f $table -t $tree -a $taxseq -m $metadata -s $repseq -o physeq.Rdata
+    qiime2phyloseq.R -f $table -t $tree -a $taxseq -m $metadata -s $repseq -o physeq.RData
     """
 }
